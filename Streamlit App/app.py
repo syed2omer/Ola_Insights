@@ -66,15 +66,35 @@ st.markdown("""
 def load_data():
     df = pd.read_excel("OLA_DataSet.xlsx", sheet_name="July")
     df.columns = df.columns.str.strip().str.replace(" ", "_")
+
+    # Fix Date
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
-    try:
-        df["Time"] = pd.to_datetime(df["Time"], unit="D").dt.strftime("%H:%M")
-    except Exception:
-        df["Time"] = pd.to_datetime(df["Time"]).dt.strftime("%H:%M")
-    df["Booking_Value"] = pd.to_numeric(df["Booking_Value"], errors="coerce").fillna(0)
-    df["Ride_Distance"] = pd.to_numeric(df["Ride_Distance"], errors="coerce").fillna(0)
+
+    # Fix Time — handle all possible formats safely
+    def parse_time(val):
+        try:
+            if pd.isna(val):
+                return ""
+            # Already a time/datetime object
+            if hasattr(val, 'strftime'):
+                return val.strftime("%H:%M")
+            # Numeric (Excel serial fraction)
+            if isinstance(val, (int, float)):
+                total_seconds = round(float(val) * 86400)
+                h = (total_seconds // 3600) % 24
+                m = (total_seconds % 3600) // 60
+                return f"{h:02d}:{m:02d}"
+            # String fallback
+            return str(val)[:5]
+        except:
+            return ""
+
+    df["Time"] = df["Time"].apply(parse_time)
+
+    df["Booking_Value"]  = pd.to_numeric(df["Booking_Value"],  errors="coerce").fillna(0)
+    df["Ride_Distance"]  = pd.to_numeric(df["Ride_Distance"],  errors="coerce").fillna(0)
     df["Driver_Ratings"] = pd.to_numeric(df["Driver_Ratings"], errors="coerce")
-    df["Customer_Rating"] = pd.to_numeric(df["Customer_Rating"], errors="coerce")
+    df["Customer_Rating"]= pd.to_numeric(df["Customer_Rating"],errors="coerce")
     return df
 
 df = load_data()
@@ -119,7 +139,6 @@ status_filter = st.sidebar.multiselect(
     default=sorted(df["Booking_Status"].unique())
 )
 
-# Apply filters
 dff = df[df["Vehicle_Type"].isin(vehicle_filter) & df["Booking_Status"].isin(status_filter)]
 
 # ── PAGE 1: OVERALL ────────────────────────────────────────────────────────────
@@ -127,10 +146,10 @@ if page == "🏠 Overall":
     st.markdown("<h1 style='color:#BA73EC;'>🚗 OLA Ride Insights — Overall</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#CCCCCC;'>July 2024 | Bangalore Operations</p>", unsafe_allow_html=True)
 
-    total = len(dff)
-    success = len(dff[dff["Booking_Status"] == "Success"])
-    revenue = dff[dff["Booking_Status"] == "Success"]["Booking_Value"].sum()
-    avg_dist = dff[dff["Booking_Status"] == "Success"]["Ride_Distance"].mean()
+    total       = len(dff)
+    success     = len(dff[dff["Booking_Status"] == "Success"])
+    revenue     = dff[dff["Booking_Status"] == "Success"]["Booking_Value"].sum()
+    avg_dist    = dff[dff["Booking_Status"] == "Success"]["Ride_Distance"].mean()
     cancel_rate = len(dff[dff["Booking_Status"].str.contains("Cancel", na=False)]) / total * 100
 
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -243,8 +262,8 @@ elif page == "💰 Revenue":
 
     success_df = dff[dff["Booking_Status"] == "Success"]
     total_rev = success_df["Booking_Value"].sum()
-    avg_rev = success_df["Booking_Value"].mean()
-    max_rev = success_df["Booking_Value"].max()
+    avg_rev   = success_df["Booking_Value"].mean()
+    max_rev   = success_df["Booking_Value"].max()
 
     c1, c2, c3 = st.columns(3)
     for col, val, label in zip(
@@ -303,8 +322,8 @@ elif page == "❌ Cancellation":
     st.markdown("<h1 style='color:#BA73EC;'>❌ Cancellation Analysis</h1>", unsafe_allow_html=True)
 
     cust_cancel = len(df[df["Booking_Status"] == "Canceled by Customer"])
-    drv_cancel = len(df[df["Booking_Status"] == "Canceled by Driver"])
-    not_found = len(df[df["Booking_Status"] == "Driver Not Found"])
+    drv_cancel  = len(df[df["Booking_Status"] == "Canceled by Driver"])
+    not_found   = len(df[df["Booking_Status"] == "Driver Not Found"])
     total_cancel = cust_cancel + drv_cancel + not_found
 
     c1, c2, c3, c4 = st.columns(4)
@@ -352,7 +371,7 @@ elif page == "❌ Cancellation":
 
     st.markdown("<div class='section-header'>Key Insights</div>", unsafe_allow_html=True)
     top_cust_reason = df["Canceled_Rides_by_Customer"].dropna().value_counts().index[0]
-    top_drv_reason = df["Canceled_Rides_by_Driver"].dropna().value_counts().index[0]
+    top_drv_reason  = df["Canceled_Rides_by_Driver"].dropna().value_counts().index[0]
     for insight in [
         f"🚗 Top customer cancellation reason: '{top_cust_reason}' ({df['Canceled_Rides_by_Customer'].value_counts().iloc[0]:,} times)",
         f"👨‍✈️ Top driver cancellation reason: '{top_drv_reason}' ({df['Canceled_Rides_by_Driver'].value_counts().iloc[0]:,} times)",
@@ -364,11 +383,11 @@ elif page == "❌ Cancellation":
 elif page == "⭐ Ratings":
     st.markdown("<h1 style='color:#BA73EC;'>⭐ Ratings Analysis</h1>", unsafe_allow_html=True)
 
-    rated = df[df["Booking_Status"] == "Success"]
-    avg_drv = rated["Driver_Ratings"].mean()
+    rated    = df[df["Booking_Status"] == "Success"]
+    avg_drv  = rated["Driver_Ratings"].mean()
     avg_cust = rated["Customer_Rating"].mean()
-    max_drv = rated["Driver_Ratings"].max()
-    min_drv = rated["Driver_Ratings"].min()
+    max_drv  = rated["Driver_Ratings"].max()
+    min_drv  = rated["Driver_Ratings"].min()
 
     c1, c2, c3, c4 = st.columns(4)
     for col, val, label in zip(
@@ -471,10 +490,8 @@ elif page == "🔍 SQL Queries":
     }
 
     selected_q = st.selectbox("Select a Query to Run", list(QUERIES.keys()))
-
     q = QUERIES[selected_q]
     st.markdown(f"<div class='sql-box'>{q['sql']}</div>", unsafe_allow_html=True)
-
     result = q["fn"](df)
     st.markdown(f"<p style='color:#BA73EC;'>→ {len(result):,} rows returned</p>", unsafe_allow_html=True)
     st.dataframe(result.head(100), use_container_width=True)

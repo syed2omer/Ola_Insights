@@ -67,7 +67,10 @@ def load_data():
     df = pd.read_excel("OLA_DataSet.xlsx", sheet_name="July")
     df.columns = df.columns.str.strip().str.replace(" ", "_")
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
-    df["Time"] = pd.to_datetime(df["Time"], unit="D").dt.strftime("%H:%M")
+    try:
+        df["Time"] = pd.to_datetime(df["Time"], unit="D").dt.strftime("%H:%M")
+    except Exception:
+        df["Time"] = pd.to_datetime(df["Time"]).dt.strftime("%H:%M")
     df["Booking_Value"] = pd.to_numeric(df["Booking_Value"], errors="coerce").fillna(0)
     df["Ride_Distance"] = pd.to_numeric(df["Ride_Distance"], errors="coerce").fillna(0)
     df["Driver_Ratings"] = pd.to_numeric(df["Driver_Ratings"], errors="coerce")
